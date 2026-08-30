@@ -53,46 +53,26 @@ class MainActivity : ComponentActivity() {
                 databaseEnabled = true
                 allowFileAccess = true
                 allowContentAccess = true
+                @Suppress("DEPRECATION")
+                setAllowUniversalAccessFromFileURLs(true)
+                @Suppress("DEPRECATION")
+                setAllowFileAccessFromFileURLs(true)
                 javaScriptCanOpenWindowsAutomatically = false
                 setSupportZoom(false)
                 builtInZoomControls = false
                 displayZoomControls = false
-                mediaPlaybackRequiresUserGesture = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                userAgentString = "$userAgentString LifeKit/1.2"
+                userAgentString = "$userAgentString LifeKit/2.1"
             }
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = false
-                override fun onPageFinished(view: WebView, url: String?) {
-                    super.onPageFinished(view, url)
-                    view.evaluateJavascript("""
-                        (function(){
-                          function load(src,next){
-                            var s=document.createElement('script');
-                            s.src=src;
-                            s.onload=next;
-                            s.onerror=function(){console.warn('LifeKit extension load failed',src)};
-                            document.body.appendChild(s);
-                          }
-                          load('bridge.js',function(){
-                            load('fixes.js',function(){
-                              load('schoolpatch.js',function(){window.dispatchEvent(new Event('lifekitFixesReady'));});
-                            });
-                          });
-                        })();
-                    """.trimIndent(), null)
-                }
             }
             webChromeClient = object : WebChromeClient() {
                 override fun onGeolocationPermissionsShowPrompt(
                     origin: String?, callback: GeolocationPermissions.Callback?
                 ) {
-                    val hasFine = ContextCompat.checkSelfPermission(
-                        this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
-                    val hasCoarse = ContextCompat.checkSelfPermission(
-                        this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION
-                    ) == PackageManager.PERMISSION_GRANTED
+                    val hasFine = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    val hasCoarse = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
                     if (hasFine || hasCoarse) callback?.invoke(origin, true, false)
                     else {
                         pendingGeoOrigin = origin
@@ -119,10 +99,7 @@ class MainActivity : ComponentActivity() {
         val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (fine || coarse) {
             webView.post {
-                webView.evaluateJavascript(
-                    "window.dispatchEvent(new CustomEvent('lifekitPermission',{detail:{location:true}}));",
-                    null
-                )
+                webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('lifekitPermission',{detail:{location:true}}));", null)
             }
             return
         }
