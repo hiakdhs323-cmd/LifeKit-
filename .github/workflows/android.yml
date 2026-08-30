@@ -35,7 +35,6 @@ jobs:
 
       - name: Build debug APK
         id: build
-        continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
@@ -51,18 +50,12 @@ jobs:
           retention-days: 14
 
       - name: Verify APK
-        if: steps.build.outcome == 'success'
         run: test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
-        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: LifeKit-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-
-      - name: Fail workflow if build failed
-        if: steps.build.outcome != 'success'
-        run: exit 1
