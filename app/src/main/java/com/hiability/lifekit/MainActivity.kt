@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
                 displayZoomControls = false
                 mediaPlaybackRequiresUserGesture = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                userAgentString = "$userAgentString LifeKit/1.1"
+                userAgentString = "$userAgentString LifeKit/1.2"
             }
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = false
@@ -74,7 +74,11 @@ class MainActivity : ComponentActivity() {
                             s.onerror=function(){console.warn('LifeKit extension load failed',src)};
                             document.body.appendChild(s);
                           }
-                          load('bridge.js',function(){ load('fixes.js',function(){ window.dispatchEvent(new Event('lifekitFixesReady')); }); });
+                          load('bridge.js',function(){
+                            load('fixes.js',function(){
+                              load('schoolpatch.js',function(){window.dispatchEvent(new Event('lifekitFixesReady'));});
+                            });
+                          });
                         })();
                     """.trimIndent(), null)
                 }
