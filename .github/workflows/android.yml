@@ -29,7 +29,7 @@ jobs:
         run: |
           mkdir -p app/src/main/res/drawable-nodpi
           test -s app/src/main/drawable/lifekit_icon.jpg
-          magick app/src/main/drawable/lifekit_icon.jpg -strip -colorspace sRGB app/src/main/res/drawable-nodpi/lifekit_icon.png
+          convert app/src/main/drawable/lifekit_icon.jpg -strip -colorspace sRGB app/src/main/res/drawable-nodpi/lifekit_icon.png
           test -s app/src/main/res/drawable-nodpi/lifekit_icon.png
           identify app/src/main/res/drawable-nodpi/lifekit_icon.png
 
