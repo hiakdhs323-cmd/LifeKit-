@@ -25,6 +25,12 @@ jobs:
         with:
           gradle-version: '8.10'
 
+      - name: Prepare launcher icon
+        run: |
+          mkdir -p app/src/main/res/drawable
+          test -s app/src/main/drawable/lifekit_icon.jpg
+          cp app/src/main/drawable/lifekit_icon.jpg app/src/main/res/drawable/lifekit_icon.jpg
+
       - name: Build debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
