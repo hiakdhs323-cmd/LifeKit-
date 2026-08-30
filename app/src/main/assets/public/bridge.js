@@ -1,0 +1,1 @@
+(function(){try{if(typeof state!=='undefined')window.state=state;}catch(e){}})();
