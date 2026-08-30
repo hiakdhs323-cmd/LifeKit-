@@ -9,81 +9,149 @@ import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 
 class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
+    private var pendingGeoOrigin: String? = null
+    private var pendingGeoCallback: GeolocationPermissions.Callback? = null
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
-        val fine = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val coarse = result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        webView.evaluateJavascript(
-            "window.dispatchEvent(new CustomEvent('lifekitPermission',{detail:{location:${fine || coarse}}}));",
-            null
-        )
+        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        val callback = pendingGeoCallback
+        val origin = pendingGeoOrigin
+        pendingGeoCallback = null
+        pendingGeoOrigin = null
+        if (granted && callback != null) {
+            callback.invoke(origin, true, false)
+        } else {
+            callback?.invoke(origin, false, false)
+            webView.post {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('lifekitPermission',{detail:{location:false}}));",
+                    null
+                )
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        webView = WebView(this)
-        setContentView(webView)
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            databaseEnabled = true
-            allowFileAccess = true
-            allowContentAccess = true
-            setSupportZoom(false)
-            builtInZoomControls = false
-            displayZoomControls = false
-            mediaPlaybackRequiresUserGesture = false
-            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-        }
-        webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = false
-        }
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback?) {
-                val fine = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                val coarse = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                if (fine || coarse) callback?.invoke(origin, true, false)
-                else {
-                    callback?.invoke(origin, false, false)
-                    requestLocationPermission()
+
+        webView = WebView(this).apply {
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                databaseEnabled = true
+                allowFileAccess = true
+                allowContentAccess = true
+                javaScriptCanOpenWindowsAutomatically = false
+                setSupportZoom(false)
+                builtInZoomControls = false
+                displayZoomControls = false
+                mediaPlaybackRequiresUserGesture = false
+                mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                userAgentString = "$userAgentString LifeKit/1.0"
+            }
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = false
+            }
+            webChromeClient = object : WebChromeClient() {
+                override fun onGeolocationPermissionsShowPrompt(
+                    origin: String?,
+                    callback: GeolocationPermissions.Callback?
+                ) {
+                    val hasFine = ContextCompat.checkSelfPermission(
+                        this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    val hasCoarse = ContextCompat.checkSelfPermission(
+                        this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+
+                    if (hasFine || hasCoarse) {
+                        callback?.invoke(origin, true, false)
+                    } else {
+                        pendingGeoOrigin = origin
+                        pendingGeoCallback = callback
+                        requestLocationPermissionInternal()
+                    }
                 }
             }
+            addJavascriptInterface(NativeBridge(this@MainActivity), "Android")
+            loadUrl("file:///android_asset/public/index.html")
         }
-        webView.addJavascriptInterface(NativeBridge(this), "Android")
-        webView.loadUrl("file:///android_asset/public/index.html")
+
+        setContentView(webView)
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) webView.goBack() else finish()
+            }
+        })
     }
 
     fun requestLocationPermission() {
-        val fine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val coarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (fine || coarse) return
-        permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+        requestLocationPermissionInternal()
     }
 
-    override fun onBackPressed() { if (webView.canGoBack()) webView.goBack() else super.onBackPressed() }
+    private fun requestLocationPermissionInternal() {
+        val fine = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarse = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (fine || coarse) {
+            webView.post {
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('lifekitPermission',{detail:{location:true}}));",
+                    null
+                )
+            }
+            return
+        }
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
 
     override fun onDestroy() {
+        pendingGeoCallback = null
+        pendingGeoOrigin = null
         webView.stopLoading()
+        webView.removeAllViews()
         webView.destroy()
         super.onDestroy()
     }
 
     class NativeBridge(private val activity: Activity) {
         private val prefs = activity.getSharedPreferences("lifekit_native", Context.MODE_PRIVATE)
-        @JavascriptInterface fun saveData(json: String?) { prefs.edit().putString("data", json ?: "").apply() }
-        @JavascriptInterface fun loadData(): String = prefs.getString("data", "") ?: ""
-        @JavascriptInterface fun requestLocationPermission() {
-            activity.runOnUiThread { (activity as? MainActivity)?.requestLocationPermission() }
+
+        @JavascriptInterface
+        fun saveData(json: String?) {
+            prefs.edit().putString("data", json ?: "").apply()
+        }
+
+        @JavascriptInterface
+        fun loadData(): String = prefs.getString("data", "") ?: ""
+
+        @JavascriptInterface
+        fun requestLocationPermission() {
+            activity.runOnUiThread {
+                (activity as? MainActivity)?.requestLocationPermission()
+            }
         }
     }
 }
