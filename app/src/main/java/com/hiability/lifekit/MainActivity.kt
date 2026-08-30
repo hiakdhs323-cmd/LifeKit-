@@ -31,9 +31,8 @@ class MainActivity : ComponentActivity() {
         val origin = pendingGeoOrigin
         pendingGeoCallback = null
         pendingGeoOrigin = null
-        if (granted && callback != null) {
-            callback.invoke(origin, true, false)
-        } else {
+        if (granted && callback != null) callback.invoke(origin, true, false)
+        else {
             callback?.invoke(origin, false, false)
             webView.post {
                 webView.evaluateJavascript(
@@ -62,18 +61,41 @@ class MainActivity : ComponentActivity() {
                 builtInZoomControls = false
                 displayZoomControls = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                userAgentString = "$userAgentString LifeKit/2.1"
+                userAgentString = "$userAgentString LifeKit/3.0"
             }
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = false
+                override fun onPageFinished(view: WebView, url: String?) {
+                    super.onPageFinished(view, url)
+                    view.evaluateJavascript(
+                        """
+                        (function(){
+                          var scripts=['bridge.js','fixes.js','schoolpatch.js','runtime-v3.js'];
+                          function next(i){
+                            if(i>=scripts.length){window.dispatchEvent(new Event('lifekitRuntimeReady'));return;}
+                            var s=document.createElement('script');
+                            s.src=scripts[i];
+                            s.onload=function(){next(i+1)};
+                            s.onerror=function(){next(i+1)};
+                            document.body.appendChild(s);
+                          }
+                          next(0);
+                        })();
+                        """.trimIndent(), null
+                    )
+                }
             }
             webChromeClient = object : WebChromeClient() {
                 override fun onGeolocationPermissionsShowPrompt(
                     origin: String?, callback: GeolocationPermissions.Callback?
                 ) {
-                    val hasFine = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                    val hasCoarse = ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                    if (hasFine || hasCoarse) callback?.invoke(origin, true, false)
+                    val fine = ContextCompat.checkSelfPermission(
+                        this@MainActivity, Manifest.permission.ACCESS_FINE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    val coarse = ContextCompat.checkSelfPermission(
+                        this@MainActivity, Manifest.permission.ACCESS_COARSE_LOCATION
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (fine || coarse) callback?.invoke(origin, true, false)
                     else {
                         pendingGeoOrigin = origin
                         pendingGeoCallback = callback
