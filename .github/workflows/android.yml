@@ -34,15 +34,35 @@ jobs:
           identify app/src/main/res/drawable-nodpi/lifekit_icon.png
 
       - name: Build debug APK
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        id: build
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: Upload build diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeKit-build-log
+          path: build.log
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Verify APK
+        if: steps.build.outcome == 'success'
         run: test -s app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: LifeKit-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Fail workflow if build failed
+        if: steps.build.outcome != 'success'
+        run: exit 1
