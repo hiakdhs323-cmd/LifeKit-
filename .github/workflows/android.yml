@@ -29,9 +29,9 @@ jobs:
         run: |
           mkdir -p app/src/main/res/drawable-nodpi
           test -s app/src/main/drawable/lifekit_icon.jpg
-          convert app/src/main/drawable/lifekit_icon.jpg -strip -colorspace sRGB app/src/main/res/drawable-nodpi/lifekit_icon.png
-          test -s app/src/main/res/drawable-nodpi/lifekit_icon.png
-          identify app/src/main/res/drawable-nodpi/lifekit_icon.png
+          cp app/src/main/drawable/lifekit_icon.jpg app/src/main/res/drawable-nodpi/lifekit_icon.jpg
+          test -s app/src/main/res/drawable-nodpi/lifekit_icon.jpg
+          file app/src/main/res/drawable-nodpi/lifekit_icon.jpg
 
       - name: Build debug APK
         id: build
